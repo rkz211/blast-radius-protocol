@@ -1,35 +1,42 @@
 # The Blast Radius Protocol
-### A Discipline for AI-Assisted Software Development
+### A Coding Architecture for Human-Directed, AI-Executed Software Development
 
 **Author:** Roark Pinkerton  
-**Date:** May 2026  
-**Context:** Developed in practice while building AI agent infrastructure and React/Amplify applications with an LLM pair-programming partner.
+**Date:** May 2026
 
 ---
 
-## The Problem
+## What This Is
 
-AI coding assistants are remarkably good at writing code. They are remarkably bad at *not breaking things*.
+The Blast Radius Protocol is a codebase architecture for a specific kind of software team: one human, one AI, no developers.
 
-The failure mode is consistent: you hand a large file to an LLM, ask it to fix one thing, and it rewrites adjacent logic, touches imports, restructures a function it didn't need to touch, and introduces a regression two layers away from what you asked about. The model wasn't trying to break anything. It just has no concept of "leave this alone." Everything in the context window is fair game.
+The human is a systems architect. They define what gets built, direct the AI, and evaluate the finished product. They never read the code. They never write the code. They never debug the code. Their job is vision, direction, and judgment.
 
-The standard response to this — careful prompting, explicit "don't touch X" instructions — is a losing game. You can't enumerate everything you don't want changed. And the model will forget halfway through a long generation anyway.
+The AI is the entire development team. It writes the code, defines the contracts, tests, debugs, and fixes regressions — across sessions, across context resets, across model switches — without the human descending into the implementation to fix anything.
 
-The root cause isn't the model's intelligence. It's the *shape of the code*. Large files have large blast radii. When the regression surface is 400 lines, any change risks 400 lines.
+The protocol is what makes that division of labor actually work.
 
-The Blast Radius Protocol is a structural solution to a structural problem.
+---
+
+## The Problem It Solves
+
+AI coding assistants fail in a predictable way: ask one to fix a thing in a large file, and it fixes the thing and breaks something adjacent. The model isn't careless. It just treats everything in the context window as fair game. When the file is 400 lines with multiple concerns, the blast radius of any edit is 400 lines.
+
+The standard response — careful prompting, "don't touch X" instructions — doesn't scale. You can't enumerate everything you don't want changed. And if the human has to watch every AI edit to catch collateral damage, you haven't built a team of one. You've built a very expensive autocomplete.
+
+The root cause is the shape of the code. **Code written for human developers is structured for human readers — and that structure is actively hostile to AI execution.**
 
 ---
 
 ## The Core Insight
 
-**Organize code around rewrite units, not readability conventions.**
+Traditional software architecture organizes code around readability conventions: logical groupings, shared context, DRY abstractions, appropriate abstraction levels. These are good for humans. They produce files that are 200-600 lines long with multiple concerns interleaved — and that means any AI edit has a wide blast radius.
 
-Traditional software architecture is designed for human readers — clean module boundaries, logical groupings, DRY principles, appropriate abstraction levels. These are good things. But they produce files that are 200-600 lines long, with multiple concerns interleaved in ways that make sense to a reader but are dangerous for an AI to touch.
+The Blast Radius Protocol organizes code around a different principle: **rewrite units**.
 
-The Blast Radius Protocol inverts the organizing principle. The question isn't "what belongs together conceptually?" It's "what is the smallest unit that can be rewritten in isolation?"
+The question isn't "what belongs together conceptually?" It's "what is the smallest unit the AI can rewrite in isolation, without understanding anything outside this file?"
 
-When you structure code this way, a regression becomes physically impossible to propagate. The model can only touch what's in the file. If the file is 80-100 lines with one job, the worst case is that one job breaks — and you know exactly where to look.
+When you structure code this way, regressions become physically impossible to propagate. The AI can only touch what's in the file. The structure enforces the boundaries — no human oversight required between edits.
 
 ---
 
@@ -37,21 +44,19 @@ When you structure code this way, a regression becomes physically impossible to 
 
 ### Rule 1 — Shard below the human-readable threshold
 
-Each block is a single file, ~80-100 lines, single concern. Not "one component." One *concern*. A hook that fetches data is separate from a hook that transforms it. A component that renders a token is separate from the component that positions it.
+Each block is a single file, ~80-100 lines, single concern. Not "one component" — one *concern*. A hook that fetches data is separate from a hook that transforms it. A component that renders is separate from the component that positions it.
 
-The threshold feels uncomfortably small at first. That's correct. The discomfort is the protocol working. You're building for rewrite surface, not reading comfort.
+This feels uncomfortably granular. That's the protocol working. The AI doesn't get uncomfortable — it gets efficient.
 
 ### Rule 2 — The assembly layer is sacred
 
-`App.tsx` (or equivalent root file) is **pure wiring**. Imports and JSX composition only. Zero logic. Zero state management beyond top-level selection. Zero inline styles that encode decisions.
+`App.tsx` (or equivalent) is **pure wiring**. Imports and composition only. Zero logic. Zero state beyond top-level delegation. No ternaries.
 
-If `App.tsx` has a ternary, something went wrong. That ternary belongs in a block.
+When the AI needs to change how blocks connect, it touches `App.tsx`. When it needs to change what a block does, it touches that block. These are never the same operation. The structure keeps them clean.
 
-The reason is surgical: when you need to change how blocks connect, you change `App.tsx`. When you need to change what a block does, you change that block. These are never the same operation. Keeping them in different files keeps them clean.
+### Rule 3 — The AI defines and owns the contracts
 
-### Rule 3 — Every block has a contract
-
-The first three lines of every block are a comment:
+The first three lines of every block are a contract:
 
 ```
 // Input: what this block receives
@@ -59,99 +64,60 @@ The first three lines of every block are a comment:
 // Must never: the behaviors this block is prohibited from having
 ```
 
-The "must never" is the most important line. It's not documentation — it's a constraint you hand to the model before you hand it the file. *"This block must never fetch data. It receives data as props and renders."* The model treats that as a hard rail.
-
-This also serves as a forcing function during design. If you can't write a one-line "must never" for a block, the block has too many concerns. Split it.
+The human doesn't write these. The AI writes them when it creates the block, and maintains them when it edits. They are the AI's own documentation of its work — and the primary tool it uses to re-orient itself when a new session starts cold.
 
 ### Rule 4 — The regression surface is one file
 
-When something breaks, the debug protocol is: identify the block, rewrite only that block, everything else frozen.
+When something breaks, the AI's debug protocol is: identify the block, rewrite only that block, everything else frozen.
 
-This sounds obvious. It isn't how most people work with AI assistants. The instinct when something breaks is to paste the whole component, or the whole page, or "here's everything, find the bug." That's how you get a new bug.
-
-Instead: locate the block. Read its contract. Rewrite just that file. The rest of the application is not in play.
+No human needs to isolate the problem. No human needs to read the code. The structure makes the blast radius visible and contained. The AI finds the block, reads its contract, rewrites just that file.
 
 ### Rule 5 — Version blocks, not apps
 
-When a block needs a significant change, create `useAuthState.v2.ts` alongside the original rather than editing in place. The original stays frozen. You build and test the new version in isolation, then swap the import in `App.tsx` when it's verified.
+When a block needs a significant change, the AI creates `block.v2.ts` alongside the original. The original stays frozen. The new version is built and tested in isolation. The import in `App.tsx` is swapped when it's verified.
 
-This gives you instant rollback at zero cost. It also makes the history of a block's evolution legible — you can see exactly what changed between v1 and v2 without reading a diff.
+Instant rollback at zero cost. The human never needs to know a version swap happened — they just see the product working or not.
 
-### Rule 6 — Blocks are the documentation
+### Rule 6 — The codebase is the handoff document
 
-In standard practice, you write code and then write docs. In the Blast Radius Protocol, the block structure *is* the documentation. A new developer (or a new AI session) can understand the system by reading the contracts. They don't need to trace logic through 400-line files.
+Every new AI session starts cold. No memory of the last conversation. In a traditional codebase, this means the human has to re-explain the project — or the AI makes changes without context and breaks things.
 
-This matters acutely for AI pair-programming. Every new session starts cold. The model doesn't remember your last conversation. If your codebase is a dense interconnected mesh, you have to re-explain it every time. If it's a set of small files with contracts, you can paste the relevant ones and the model has everything it needs.
-
----
-
-## Why This Works With AI Specifically
-
-### The context window is a constraint, not a bug
-
-LLMs have context limits. Traditional wisdom says: give the model more context so it understands the codebase better. The Blast Radius Protocol runs the opposite direction. *Give the model less context, intentionally, because less context means less that can go wrong.*
-
-When you hand a model an 80-line file with a clear contract, it has exactly what it needs and nothing it can accidentally damage. The constraint is the safety mechanism.
-
-### AI doesn't understand "leave this alone"
-
-Humans reading code have a strong instinct for what's load-bearing and what's not. We see a comment that says "don't touch this timing logic" and we don't touch it. Models are worse at this — they understand the instruction but don't have the same visceral sense of risk. They'll "clean up" something that didn't need cleaning.
-
-The protocol solves this architecturally. "Leave this alone" is no longer an instruction you give the model. It's a property of the file structure. The model literally cannot touch what isn't in the file.
-
-### Cold session recovery
-
-One of the most underrated costs of AI-assisted development is session restart overhead. Every time you start a new conversation, you re-explain the project. With a Blast Radius codebase, the recovery procedure is: paste `App.tsx` (the wiring map), paste the relevant blocks, paste their contracts. You're live in one message.
-
-Compare this to a traditional codebase where you have to reconstruct context by pasting hundreds of lines and explaining how they connect. The protocol converts session restart from a 5-minute tax to a 30-second one.
+In a Blast Radius codebase, the AI re-orients itself by reading `App.tsx` (the wiring map) and the contracts of the blocks it needs to touch. That's the entire handoff. The human doesn't manage it. The structure carries the context automatically.
 
 ---
 
-## What This Is Not
+## The Operating Model
 
-**It's not a component library philosophy.** This isn't about React patterns or atomic design. It applies equally to backend modules, Python scripts, or any codebase where AI will be doing the editing.
+This protocol enables a specific way of building software:
 
-**It's not about file size for its own sake.** The 80-100 line guideline is a consequence of the single-concern rule, not the point. A block that naturally fits in 60 lines stays at 60. A block that genuinely needs 120 is fine. The question is always: can this be rewritten in isolation without understanding anything outside this file?
+**The human's role:** Define what the product should do. Direct the AI toward the next thing. Look at the finished product and say whether it's right. Provide judgment when the AI is stuck — not technical answers, architectural ones.
 
-**It's not defensive programming.** This isn't about error handling or input validation. It's purely about structuring code so that AI edits are physically constrained to the right surface.
+**The AI's role:** Everything else. Architecture of individual blocks, contracts, implementation, testing, debugging, regression fixes, session handoffs.
+
+**What the human never does:** Read the code. Write the code. Isolate a bug. Explain a file structure. Review a diff.
+
+The human evaluates the product, not the implementation. The protocol makes that possible by ensuring the AI can operate on itself without human intervention in the technical layer.
 
 ---
 
-## The Analogy That Clarifies It
+## Why This Works
 
-Think of a ship's bulkhead system. A ship doesn't have one large open hull — it has compartments separated by watertight walls. When a compartment floods, the damage is contained. The ship doesn't sink.
+The context window is not a bug to route around — it's a constraint to design for. When a block is 80 lines with a clear contract, the AI has exactly what it needs and nothing it can accidentally damage. The constraint is the safety mechanism.
 
-Traditional codebases are open hulls. One bad edit floods everything. The Blast Radius Protocol is bulkheads. An AI regression in one block cannot reach another. The ship sails.
+"Leave this alone" stops being an instruction you give the model. It becomes a property of the file structure. The model literally cannot touch what isn't in the file.
+
+And critically: this produces code that is **native to how AI executes**, not how humans read. The AI isn't being asked to work inside a structure built for someone else. It's working inside a structure built for it.
 
 ---
 
 ## Observed Results
 
-This protocol emerged from active practice building production AI infrastructure — a multi-agent AI companion system and a Factorio-style real-time agent dashboard — using LLM pair-programming exclusively. No human wrote code outside of a model context.
+Built in practice across several weeks of daily AI-directed development — production AI infrastructure and a real-time agent dashboard — with no human writing or reading code at any point.
 
-Observable results over approximately two weeks of daily use:
-
-- **Regression rate dropped to near zero** after the protocol was formalized. Regressions before the protocol were a consistent daily occurrence. After: isolated to rare cases where a block's contract was ambiguous.
-
-- **Debug time collapsed.** When something breaks, finding the block takes 30 seconds. The model rewrites just that block in one pass. Before: debugging required re-explaining large files and hoping the model found the right line.
-
-- **New AI sessions become cheap.** Onboarding a fresh model context into a Blast Radius codebase takes roughly 3-5 messages. Equivalent ramp-up on a traditional codebase took 15-20 exchanges before the model had enough context to be useful.
-
-- **The codebase scales better than expected.** As the project grew, complexity didn't accumulate in the way it typically does. Each new feature is a new block. Blocks don't entangle because their contracts prohibit it.
-
----
-
-## The Deeper Principle
-
-The Blast Radius Protocol is really an observation about the nature of AI editing vs. human editing.
-
-Human developers edit large files well because they have deep context, strong working memory, and visceral risk intuition built from years of breaking things. They know which lines are load-bearing.
-
-AI assistants don't have those properties in the same way. They have broad knowledge and strong generation ability, but shallow project-specific memory and limited "leave it alone" instinct.
-
-The correct response isn't to try to make AI assistants behave more like humans. It's to structure the codebase so that AI *generation ability* is the property you're using, while the properties AI *lacks* are rendered structurally irrelevant.
-
-That's the whole protocol. Design for the strengths. Architect away the weaknesses.
+- **Regressions dropped to near zero** after the protocol was formalized
+- **Debug cycles collapsed** — identify the block, rewrite it, done
+- **Cold session recovery takes minutes, not hours** — `App.tsx` + relevant contracts is the entire handoff
+- **The human stayed entirely out of the implementation** — product review only, start to finish
 
 ---
 
@@ -159,13 +125,13 @@ That's the whole protocol. Design for the strengths. Architect away the weakness
 
 | Principle | Rule |
 |---|---|
-| File size | ~80-100 lines max, one concern |
-| Assembly layer | Pure imports + JSX wiring only, zero logic |
-| Block contract | Input / Output / Must Never — first 3 lines |
+| File size | ~80-100 lines, one concern |
+| Assembly layer | Pure wiring only — imports and composition, zero logic |
+| Contracts | AI writes and owns Input / Output / Must Never |
 | Regression scope | Identify block → rewrite that file only |
 | Versioning | `block.v2.ts` alongside original, swap import when verified |
-| Cold session | Paste App.tsx + relevant blocks + contracts |
-| Debug | Name the block. Rewrite just that. Done. |
+| Session handoff | `App.tsx` + relevant block contracts — no human required |
+| Human role | Vision, direction, product review — never the code |
 
 ---
 
@@ -175,4 +141,4 @@ See the [`/examples`](/examples) directory for annotated code samples showing wh
 
 ---
 
-*The Blast Radius Protocol is not a framework. It has no dependencies. It requires no tooling. It's a discipline — a way of thinking about code structure when your pair-programming partner is a language model.*
+*The Blast Radius Protocol is not a framework. It has no dependencies. It requires no tooling. It is an operating model for a new kind of software team.*
